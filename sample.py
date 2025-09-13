@@ -2,7 +2,6 @@ from pgmpy.models import DiscreteBayesianNetwork
 from pgmpy.factors.discrete import TabularCPD
 from pgmpy.inference import VariableElimination
 import random, time
-import matplotlib.pyplot as plt
 
 # -------------------------------
 # 1. Define Bayesian Network
@@ -67,60 +66,107 @@ print("Model is valid:", model.check_model())
 infer = VariableElimination(model)
 
 # -------------------------------
-# 2. Quick Test Cases
+# 2. Choose Mode: Graph or GUI
 # -------------------------------
-query = infer.query(variables=['Danger'], evidence={'Activity': 'Jumping', 'Proximity': 'NearHazard', 'Environment': 'Slippery'})
-print("\nCase 1: Jumping + NearHazard + Slippery")
-print(query)
+mode = input("\nEnter mode (graph/gui): ").strip().lower()
 
-query = infer.query(variables=['Danger'], evidence={'Activity': 'Calm', 'Proximity': 'Safe', 'Environment': 'Normal'})
-print("\nCase 2: Calm + Safe + Normal")
-print(query)
-
-# -------------------------------
-# 3. Continuous Monitoring + Plot
-# -------------------------------
 activities = ['Calm', 'Running', 'Jumping']
 proximities = ['Safe', 'NearHazard']
 environments = ['Normal', 'Slippery']
 
-probabilities = []
-steps = []
+# -------------------------------
+# Graph Mode
+# -------------------------------
+if mode == "graph":
+    import matplotlib.pyplot as plt
 
-print("\n--- Starting Child Safety Monitoring ---\n")
+    probabilities = []
+    steps = []
 
-for i in range(15):  # simulate 15 steps
-    activity = random.choice(activities)
-    proximity = random.choice(proximities)
-    environment = random.choice(environments)
+    print("\n--- Starting Child Safety Monitoring (Graph Mode) ---\n")
 
-    query = infer.query(
-        variables=['Danger'],
-        evidence={'Activity': activity, 'Proximity': proximity, 'Environment': environment}
-    )
-    prob_danger = query.values[1]  # probability of Danger=Yes
+    for i in range(15):  # simulate 15 steps
+        activity = random.choice(activities)
+        proximity = random.choice(proximities)
+        environment = random.choice(environments)
 
-    # Decision
-    status = "🚨 Alarm" if prob_danger > 0.7 else "✅ Safe"
-    print(f"Step {i+1}: Activity={activity}, Proximity={proximity}, Environment={environment} "
-          f"=> P(Danger)={prob_danger:.2f} → {status}")
+        query = infer.query(
+            variables=['Danger'],
+            evidence={'Activity': activity, 'Proximity': proximity, 'Environment': environment}
+        )
+        prob_danger = query.values[1]  # probability of Danger=Yes
 
-    # Save for plot
-    probabilities.append(prob_danger)
-    steps.append(i+1)
+        status = "🚨 Alarm" if prob_danger > 0.7 else "✅ Safe"
+        print(f"Step {i+1}: Activity={activity}, Proximity={proximity}, Environment={environment} "
+              f"=> P(Danger)={prob_danger:.2f} → {status}")
 
-    time.sleep(0.5)
+        probabilities.append(prob_danger)
+        steps.append(i+1)
+
+        time.sleep(0.5)
+
+    # Plot results
+    plt.figure(figsize=(10,5))
+    plt.plot(steps, probabilities, marker='o', color='red', label='Danger Probability')
+    plt.axhline(y=0.7, color='blue', linestyle='--', label='Alarm Threshold (0.7)')
+    plt.title("Danger Probability Over Time")
+    plt.xlabel("Time Step")
+    plt.ylabel("P(Danger = Yes)")
+    plt.ylim(0,1)
+    plt.legend()
+    plt.grid(True)
+    plt.show()
 
 # -------------------------------
-# 4. Plot Results
+# GUI Mode
 # -------------------------------
-plt.figure(figsize=(10,5))
-plt.plot(steps, probabilities, marker='o', color='red', label='Danger Probability')
-plt.axhline(y=0.7, color='blue', linestyle='--', label='Alarm Threshold (0.7)')
-plt.title("Danger Probability Over Time")
-plt.xlabel("Time Step")
-plt.ylabel("P(Danger = Yes)")
-plt.ylim(0,1)
-plt.legend()
-plt.grid(True)
-plt.show()
+elif mode == "gui":
+    import tkinter as tk
+    from threading import Thread
+
+    root = tk.Tk()
+    root.title("Child Safety Monitor (Bayesian Inference)")
+    root.geometry("500x250")
+
+    status_label = tk.Label(root, text="Starting...", font=("Arial", 20), pady=20)
+    status_label.pack()
+
+    info_label = tk.Label(root, text="", font=("Arial", 12))
+    info_label.pack()
+
+    prob_label = tk.Label(root, text="", font=("Arial", 14))
+    prob_label.pack()
+
+    def monitoring_loop():
+        step = 1
+        while True:
+            activity = random.choice(activities)
+            proximity = random.choice(proximities)
+            environment = random.choice(environments)
+
+            query = infer.query(
+                variables=['Danger'],
+                evidence={'Activity': activity, 'Proximity': proximity, 'Environment': environment}
+            )
+            prob_danger = query.values[1]
+
+            if prob_danger > 0.7:
+                status = "🚨 ALARM: HIGH RISK 🚨"
+                color = "red"
+            else:
+                status = "✅ SAFE"
+                color = "green"
+
+            status_label.config(text=status, fg=color)
+            info_label.config(text=f"Step {step}: Activity={activity}, Proximity={proximity}, Env={environment}")
+            prob_label.config(text=f"P(Danger)={prob_danger:.2f}")
+
+            step += 1
+            time.sleep(1)
+
+    thread = Thread(target=monitoring_loop, daemon=True)
+    thread.start()
+    root.mainloop()
+
+else:
+    print("Invalid mode! Please run again and choose either 'graph' or 'gui'.")
