@@ -1,15 +1,17 @@
 from pgmpy.models import DiscreteBayesianNetwork
 from pgmpy.factors.discrete import TabularCPD
 from pgmpy.inference import VariableElimination
+import random, time
+import matplotlib.pyplot as plt
 
-# Step 1: Define the Bayesian Network structure
+# -------------------------------
+# 1. Define Bayesian Network
+# -------------------------------
 model = DiscreteBayesianNetwork([
     ('Activity', 'Danger'),
     ('Proximity', 'Danger'),
     ('Environment', 'Danger')
 ])
-
-# Step 2: Define Conditional Probability Tables (CPTs)
 
 # Prior: Activity
 cpd_activity = TabularCPD(
@@ -55,57 +57,70 @@ cpd_danger = TabularCPD(
     }
 )
 
-# Step 3: Add CPDs to the model
+# Add CPDs to the model
 model.add_cpds(cpd_activity, cpd_proximity, cpd_environment, cpd_danger)
 
-# Step 4: Check model validity
+# Validate model
 print("Model is valid:", model.check_model())
 
-# Step 5: Inference
+# Inference object
 infer = VariableElimination(model)
 
-# Example 1: Child is Jumping near Hazard on Slippery surface
+# -------------------------------
+# 2. Quick Test Cases
+# -------------------------------
 query = infer.query(variables=['Danger'], evidence={'Activity': 'Jumping', 'Proximity': 'NearHazard', 'Environment': 'Slippery'})
 print("\nCase 1: Jumping + NearHazard + Slippery")
 print(query)
 
-# Example 2: Child is Calm and Safe in Normal environment
 query = infer.query(variables=['Danger'], evidence={'Activity': 'Calm', 'Proximity': 'Safe', 'Environment': 'Normal'})
 print("\nCase 2: Calm + Safe + Normal")
 print(query)
 
-
-import random, time
-
-# Possible states
+# -------------------------------
+# 3. Continuous Monitoring + Plot
+# -------------------------------
 activities = ['Calm', 'Running', 'Jumping']
 proximities = ['Safe', 'NearHazard']
 environments = ['Normal', 'Slippery']
 
+probabilities = []
+steps = []
+
 print("\n--- Starting Child Safety Monitoring ---\n")
 
-for i in range(10):  # simulate 10 time steps
-    # Randomly pick sensor states
+for i in range(15):  # simulate 15 steps
     activity = random.choice(activities)
     proximity = random.choice(proximities)
     environment = random.choice(environments)
 
-    # Run Bayesian inference
     query = infer.query(
         variables=['Danger'],
         evidence={'Activity': activity, 'Proximity': proximity, 'Environment': environment}
     )
-    prob_danger = query.values[1]  # index 1 = Danger(Yes)
+    prob_danger = query.values[1]  # probability of Danger=Yes
 
-    # Decision rule
-    if prob_danger > 0.7:
-        status = "🚨 Alarm! High Risk"
-    else:
-        status = "✅ Safe"
-
-    # Print result
+    # Decision
+    status = "🚨 Alarm" if prob_danger > 0.7 else "✅ Safe"
     print(f"Step {i+1}: Activity={activity}, Proximity={proximity}, Environment={environment} "
           f"=> P(Danger)={prob_danger:.2f} → {status}")
 
-    time.sleep(1)  # wait 1 sec to simulate live monitoring
+    # Save for plot
+    probabilities.append(prob_danger)
+    steps.append(i+1)
 
+    time.sleep(0.5)
+
+# -------------------------------
+# 4. Plot Results
+# -------------------------------
+plt.figure(figsize=(10,5))
+plt.plot(steps, probabilities, marker='o', color='red', label='Danger Probability')
+plt.axhline(y=0.7, color='blue', linestyle='--', label='Alarm Threshold (0.7)')
+plt.title("Danger Probability Over Time")
+plt.xlabel("Time Step")
+plt.ylabel("P(Danger = Yes)")
+plt.ylim(0,1)
+plt.legend()
+plt.grid(True)
+plt.show()
