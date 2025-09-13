@@ -1,4 +1,25 @@
 import random, time, math
+import numpy as np
+import skfuzzy as fuzz
+
+# Define universe for danger probability
+x = np.linspace(0, 1, 100)
+
+# Membership functions
+safe_mf = fuzz.trimf(x, [0.0, 0.0, 0.3])
+caution_mf = fuzz.trimf(x, [0.2, 0.4, 0.6])
+high_mf = fuzz.trimf(x, [0.5, 0.7, 0.85])
+critical_mf = fuzz.trimf(x, [0.7, 1.0, 1.0])
+
+def fuzzy_action(prob_danger):
+    membership = {
+        "Safe": fuzz.interp_membership(x, safe_mf, prob_danger),
+        "Caution": fuzz.interp_membership(x, caution_mf, prob_danger),
+        "High": fuzz.interp_membership(x, high_mf, prob_danger),
+        "Critical": fuzz.interp_membership(x, critical_mf, prob_danger),
+    }
+    decision = max(membership, key=membership.get)
+    return decision, membership
 
 # -------------------------------
 # Tuned Risk Weights (more human-like)
@@ -96,7 +117,8 @@ if mode == "graph":
     for i in range(10):
         evidence = get_evidence(i, input_mode)
         prob_danger = compute_danger_probability(evidence)
-        status = "🚨 Alarm" if prob_danger > 0.7 else "✅ Safe"
+        decision, _ = fuzzy_action(prob_danger)
+        status = f"Decision: {decision}"
 
         print(f"Step {i+1}: {evidence} => P(Danger)={prob_danger:.2f} → {status}")
         probabilities.append(prob_danger)
@@ -141,10 +163,16 @@ elif mode == "gui":
             evidence = get_evidence(step, input_mode)
             prob_danger = compute_danger_probability(evidence)
 
-            if prob_danger > 0.7:
-                status, color = "🚨 ALARM: HIGH RISK 🚨", "red"
-            else:
+            decision, _ = fuzzy_action(prob_danger)
+            if decision == "Safe":
                 status, color = "✅ SAFE", "green"
+            elif decision == "Caution":
+                status, color = "⚠️ CAUTION", "orange"
+            elif decision == "High":
+                status, color = "🚨 HIGH RISK", "red"
+            else:  # Critical
+                status, color = "🛑 CRITICAL", "darkred"
+
 
             status_label.config(text=status, fg=color)
             info_label.config(text=f"Step {step}: {evidence}")
@@ -158,3 +186,30 @@ elif mode == "gui":
 
 else:
     print("Invalid mode! Please run again and choose either 'graph' or 'gui'.")
+
+import numpy as np
+import matplotlib.pyplot as plt
+import skfuzzy as fuzz
+
+# Define universe (danger probability range 0–1)
+x = np.linspace(0, 1, 100)
+
+# Membership functions
+safe = fuzz.trimf(x, [0.0, 0.0, 0.3])
+caution = fuzz.trimf(x, [0.2, 0.4, 0.6])
+high = fuzz.trimf(x, [0.5, 0.7, 0.85])
+critical = fuzz.trimf(x, [0.7, 1.0, 1.0])
+
+# Plot fuzzy sets
+plt.figure(figsize=(10,6))
+plt.plot(x, safe, 'g', linewidth=2, label='Safe')
+plt.plot(x, caution, 'orange', linewidth=2, label='Caution')
+plt.plot(x, high, 'r', linewidth=2, label='High Risk')
+plt.plot(x, critical, 'darkred', linewidth=2, label='Critical')
+
+plt.title("Fuzzy Membership Functions for Danger Probability")
+plt.xlabel("Danger Probability (0 = Safe, 1 = Certain Danger)")
+plt.ylabel("Membership Degree")
+plt.legend()
+plt.grid(True)
+plt.show()
