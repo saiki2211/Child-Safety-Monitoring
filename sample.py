@@ -1,18 +1,19 @@
 import random, time, math
 
 # -------------------------------
-# Risk Weights
+# Tuned Risk Weights (more human-like)
 # -------------------------------
 risk_weights = {
     "Activity": {"Calm": 0.0, "Running": 0.3, "Jumping": 0.6},
     "Proximity": {"Safe": 0.0, "NearHazard": 0.4},
-    "Environment": {"Normal": 0.0, "Slippery": 0.3},
-    "Age": {"Teen": 0.1, "Young": 0.3},
-    "Weather": {"Sunny": 0.0, "Rainy": 0.2},
-    "Supervision": {"Yes": 0.0, "No": 0.4},
+    "Environment": {"Normal": 0.0, "Slippery": 0.2},   # was 0.3
+    "Age": {"Teen": 0.05, "Young": 0.2},              # Teen softer
+    "Weather": {"Sunny": 0.0, "Rainy": 0.1},          # was 0.2
+    "Supervision": {"Yes": 0.0, "No": 0.2},           # was 0.4
 }
 
-def sigmoid(x, k=2):
+# Softer sigmoid curve (k=1.5 instead of 2.0)
+def sigmoid(x, k=1.5):
     return 1 / (1 + math.exp(-k * x))
 
 def compute_danger_probability(evidence):
@@ -29,6 +30,7 @@ ages = ["Teen", "Young"]
 weathers = ["Sunny", "Rainy"]
 supervisions = ["Yes", "No"]
 
+# Example Scenarios
 scenarios = [
     {"Activity": "Jumping", "Proximity": "NearHazard", "Environment": "Slippery",
      "Age": "Young", "Weather": "Rainy", "Supervision": "No"},
