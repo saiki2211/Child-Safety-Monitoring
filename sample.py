@@ -73,3 +73,39 @@ print(query)
 query = infer.query(variables=['Danger'], evidence={'Activity': 'Calm', 'Proximity': 'Safe', 'Environment': 'Normal'})
 print("\nCase 2: Calm + Safe + Normal")
 print(query)
+
+
+import random, time
+
+# Possible states
+activities = ['Calm', 'Running', 'Jumping']
+proximities = ['Safe', 'NearHazard']
+environments = ['Normal', 'Slippery']
+
+print("\n--- Starting Child Safety Monitoring ---\n")
+
+for i in range(10):  # simulate 10 time steps
+    # Randomly pick sensor states
+    activity = random.choice(activities)
+    proximity = random.choice(proximities)
+    environment = random.choice(environments)
+
+    # Run Bayesian inference
+    query = infer.query(
+        variables=['Danger'],
+        evidence={'Activity': activity, 'Proximity': proximity, 'Environment': environment}
+    )
+    prob_danger = query.values[1]  # index 1 = Danger(Yes)
+
+    # Decision rule
+    if prob_danger > 0.7:
+        status = "🚨 Alarm! High Risk"
+    else:
+        status = "✅ Safe"
+
+    # Print result
+    print(f"Step {i+1}: Activity={activity}, Proximity={proximity}, Environment={environment} "
+          f"=> P(Danger)={prob_danger:.2f} → {status}")
+
+    time.sleep(1)  # wait 1 sec to simulate live monitoring
+
