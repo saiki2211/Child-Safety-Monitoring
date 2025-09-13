@@ -1,115 +1,111 @@
-from pgmpy.models import DiscreteBayesianNetwork
-from pgmpy.factors.discrete import TabularCPD
-from pgmpy.inference import VariableElimination
-import random, time
+import random, time, math
 
 # -------------------------------
-# 1. Define Bayesian Network
+# Risk Weights
 # -------------------------------
-model = DiscreteBayesianNetwork([
-    ('Activity', 'Danger'),
-    ('Proximity', 'Danger'),
-    ('Environment', 'Danger')
-])
+risk_weights = {
+    "Activity": {"Calm": 0.0, "Running": 0.3, "Jumping": 0.6},
+    "Proximity": {"Safe": 0.0, "NearHazard": 0.4},
+    "Environment": {"Normal": 0.0, "Slippery": 0.3},
+    "Age": {"Teen": 0.1, "Young": 0.3},
+    "Weather": {"Sunny": 0.0, "Rainy": 0.2},
+    "Supervision": {"Yes": 0.0, "No": 0.4},
+}
 
-# Prior: Activity
-cpd_activity = TabularCPD(
-    variable='Activity',
-    variable_card=3,
-    values=[[0.5], [0.3], [0.2]],  # Calm=50%, Running=30%, Jumping=20%
-    state_names={'Activity': ['Calm', 'Running', 'Jumping']}
-)
+def sigmoid(x, k=2):
+    return 1 / (1 + math.exp(-k * x))
 
-# Prior: Proximity
-cpd_proximity = TabularCPD(
-    variable='Proximity',
-    variable_card=2,
-    values=[[0.7], [0.3]],  # Safe=70%, NearHazard=30%
-    state_names={'Proximity': ['Safe', 'NearHazard']}
-)
-
-# Prior: Environment
-cpd_environment = TabularCPD(
-    variable='Environment',
-    variable_card=2,
-    values=[[0.8], [0.2]],  # Normal=80%, Slippery=20%
-    state_names={'Environment': ['Normal', 'Slippery']}
-)
-
-# CPT for Danger
-cpd_danger = TabularCPD(
-    variable='Danger',
-    variable_card=2,
-    values=[
-        # Danger=No
-        [0.99, 0.90, 0.85, 0.70, 0.95, 0.60, 0.40, 0.05, 0.10, 0.01, 0.20, 0.05],
-        # Danger=Yes
-        [0.01, 0.10, 0.15, 0.30, 0.05, 0.40, 0.60, 0.95, 0.90, 0.99, 0.80, 0.95]
-    ],
-    evidence=['Activity', 'Proximity', 'Environment'],
-    evidence_card=[3, 2, 2],
-    state_names={
-        'Danger': ['No', 'Yes'],
-        'Activity': ['Calm', 'Running', 'Jumping'],
-        'Proximity': ['Safe', 'NearHazard'],
-        'Environment': ['Normal', 'Slippery']
-    }
-)
-
-# Add CPDs to the model
-model.add_cpds(cpd_activity, cpd_proximity, cpd_environment, cpd_danger)
-
-# Validate model
-print("Model is valid:", model.check_model())
-
-# Inference object
-infer = VariableElimination(model)
+def compute_danger_probability(evidence):
+    risk_score = sum(risk_weights[var][evidence[var]] for var in evidence)
+    return sigmoid(risk_score)
 
 # -------------------------------
-# 2. Choose Mode: Graph or GUI
+# Variables
+# -------------------------------
+activities = ["Calm", "Running", "Jumping"]
+proximities = ["Safe", "NearHazard"]
+environments = ["Normal", "Slippery"]
+ages = ["Teen", "Young"]
+weathers = ["Sunny", "Rainy"]
+supervisions = ["Yes", "No"]
+
+scenarios = [
+    {"Activity": "Jumping", "Proximity": "NearHazard", "Environment": "Slippery",
+     "Age": "Young", "Weather": "Rainy", "Supervision": "No"},
+    {"Activity": "Running", "Proximity": "Safe", "Environment": "Normal",
+     "Age": "Teen", "Weather": "Sunny", "Supervision": "Yes"},
+    {"Activity": "Calm", "Proximity": "Safe", "Environment": "Slippery",
+     "Age": "Young", "Weather": "Sunny", "Supervision": "Yes"},
+]
+
+# -------------------------------
+# Input Normalization Helper
+# -------------------------------
+def normalize_input(prompt, options):
+    val = input(prompt).strip().lower()
+    mapping = {opt.lower(): opt for opt in options}  # map lowercase → correct form
+    while val not in mapping:
+        print(f"Invalid input! Choose from: {options}")
+        val = input(prompt).strip().lower()
+    return mapping[val]
+
+# -------------------------------
+# Input Mode Logic
+# -------------------------------
+def get_evidence(step, input_mode):
+    if input_mode == "random":
+        return {
+            "Activity": random.choice(activities),
+            "Proximity": random.choice(proximities),
+            "Environment": random.choice(environments),
+            "Age": random.choice(ages),
+            "Weather": random.choice(weathers),
+            "Supervision": random.choice(supervisions),
+        }
+    elif input_mode == "scenario":
+        return scenarios[step % len(scenarios)]
+    elif input_mode == "manual":
+        return {
+            "Activity": normalize_input("Enter Activity (Calm/Running/Jumping): ", activities),
+            "Proximity": normalize_input("Enter Proximity (Safe/NearHazard): ", proximities),
+            "Environment": normalize_input("Enter Environment (Normal/Slippery): ", environments),
+            "Age": normalize_input("Enter Age (Teen/Young): ", ages),
+            "Weather": normalize_input("Enter Weather (Sunny/Rainy): ", weathers),
+            "Supervision": normalize_input("Enter Supervision (Yes/No): ", supervisions),
+        }
+    else:
+        raise ValueError("Invalid input mode!")
+
+# -------------------------------
+# Mode Selection
 # -------------------------------
 mode = input("\nEnter mode (graph/gui): ").strip().lower()
-
-activities = ['Calm', 'Running', 'Jumping']
-proximities = ['Safe', 'NearHazard']
-environments = ['Normal', 'Slippery']
+input_mode = input("Choose input mode (random/scenario/manual): ").strip().lower()
 
 # -------------------------------
 # Graph Mode
 # -------------------------------
 if mode == "graph":
     import matplotlib.pyplot as plt
+    probabilities, steps = [], []
 
-    probabilities = []
-    steps = []
+    print("\n--- Starting Safety Monitoring (Graph Mode) ---\n")
 
-    print("\n--- Starting Child Safety Monitoring (Graph Mode) ---\n")
-
-    for i in range(15):  # simulate 15 steps
-        activity = random.choice(activities)
-        proximity = random.choice(proximities)
-        environment = random.choice(environments)
-
-        query = infer.query(
-            variables=['Danger'],
-            evidence={'Activity': activity, 'Proximity': proximity, 'Environment': environment}
-        )
-        prob_danger = query.values[1]  # probability of Danger=Yes
-
+    for i in range(10):
+        evidence = get_evidence(i, input_mode)
+        prob_danger = compute_danger_probability(evidence)
         status = "🚨 Alarm" if prob_danger > 0.7 else "✅ Safe"
-        print(f"Step {i+1}: Activity={activity}, Proximity={proximity}, Environment={environment} "
-              f"=> P(Danger)={prob_danger:.2f} → {status}")
 
+        print(f"Step {i+1}: {evidence} => P(Danger)={prob_danger:.2f} → {status}")
         probabilities.append(prob_danger)
         steps.append(i+1)
-
         time.sleep(0.5)
 
-    # Plot results
+    # Plot
     plt.figure(figsize=(10,5))
     plt.plot(steps, probabilities, marker='o', color='red', label='Danger Probability')
     plt.axhline(y=0.7, color='blue', linestyle='--', label='Alarm Threshold (0.7)')
-    plt.title("Danger Probability Over Time")
+    plt.title("Danger Probability Over Time (6 Variables)")
     plt.xlabel("Time Step")
     plt.ylabel("P(Danger = Yes)")
     plt.ylim(0,1)
@@ -125,8 +121,8 @@ elif mode == "gui":
     from threading import Thread
 
     root = tk.Tk()
-    root.title("Child Safety Monitor (Bayesian Inference)")
-    root.geometry("500x250")
+    root.title("Cognitive Robot Safety Monitor")
+    root.geometry("600x320")
 
     status_label = tk.Label(root, text="Starting...", font=("Arial", 20), pady=20)
     status_label.pack()
@@ -140,32 +136,22 @@ elif mode == "gui":
     def monitoring_loop():
         step = 1
         while True:
-            activity = random.choice(activities)
-            proximity = random.choice(proximities)
-            environment = random.choice(environments)
-
-            query = infer.query(
-                variables=['Danger'],
-                evidence={'Activity': activity, 'Proximity': proximity, 'Environment': environment}
-            )
-            prob_danger = query.values[1]
+            evidence = get_evidence(step, input_mode)
+            prob_danger = compute_danger_probability(evidence)
 
             if prob_danger > 0.7:
-                status = "🚨 ALARM: HIGH RISK 🚨"
-                color = "red"
+                status, color = "🚨 ALARM: HIGH RISK 🚨", "red"
             else:
-                status = "✅ SAFE"
-                color = "green"
+                status, color = "✅ SAFE", "green"
 
             status_label.config(text=status, fg=color)
-            info_label.config(text=f"Step {step}: Activity={activity}, Proximity={proximity}, Env={environment}")
+            info_label.config(text=f"Step {step}: {evidence}")
             prob_label.config(text=f"P(Danger)={prob_danger:.2f}")
 
             step += 1
             time.sleep(1)
 
-    thread = Thread(target=monitoring_loop, daemon=True)
-    thread.start()
+    Thread(target=monitoring_loop, daemon=True).start()
     root.mainloop()
 
 else:
